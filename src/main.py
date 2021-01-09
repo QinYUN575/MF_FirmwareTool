@@ -1,7 +1,7 @@
 import sys, os
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (QFileDialog, QMessageBox)
-from UI import Ui_MainWindow
+from _ui import Ui_MainWindow
 
 import hashlib, struct
 

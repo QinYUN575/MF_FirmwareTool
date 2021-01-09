@@ -1,8 +1,8 @@
 # MF_FirmwareTool 细节描述
 
-## 功能描述
+## 界面 &&功能描述
 
-
+![MF_FirmwareTool](./.assets/mf_firmwaretool.png)
 
 ### TODO：
 
@@ -20,7 +20,6 @@ K210 编译的固件(原始固件)前 6 个字节为标记字节：[0x21 0xA8 0x
 | 头部校验信息 | 0x00 | |
 | 固件内容(原始固件) | 0x00 | |
 | 尾部信息 | --- | |
-
 
 ## pyinstaller 打包
 
