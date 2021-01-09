@@ -4,8 +4,17 @@
 
 ![MF_FirmwareTool](./.assets/mf_firmwaretool.png)
 
-### TODO：
+### 功能 TODO：
 
+MF 固件工具
+
+基础功能：
+
+[-] 区分是否为预烧录固件
+
+[] 预烧录固件与非预烧录固件相互转换
+
+[x] 支持文件校验：MD5/SHA256 校验
 
 
 
