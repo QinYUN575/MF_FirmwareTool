@@ -16,38 +16,38 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         # font.setFamily("微软雅黑")
         font.setPointSize(14)
-        MainWindow.resize(560, 278)
+        MainWindow.resize(620, 278)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
 
         self.ConversionToBurnButton = QtWidgets.QPushButton(self.centralwidget)
-        self.ConversionToBurnButton.setGeometry(QtCore.QRect(330, 80, 221, 51))
+        self.ConversionToBurnButton.setGeometry(QtCore.QRect(330+50, 80, 221, 51))
 
         self.ConversionToNormalButton = QtWidgets.QPushButton(self.centralwidget)
-        self.ConversionToNormalButton.setGeometry(QtCore.QRect(330, 140, 221, 51))
+        self.ConversionToNormalButton.setGeometry(QtCore.QRect(330+50, 140, 221, 51))
 
         self.fileTypeInfo = QtWidgets.QLabel(self.centralwidget)
-        self.fileTypeInfo.setGeometry(QtCore.QRect(10, 60, 300, 51))
+        self.fileTypeInfo.setGeometry(QtCore.QRect(10, 60, 350, 51))
         font.setPointSize(12)
         self.fileTypeInfo.setFont(font)
 
         self.scrollArea = QtWidgets.QScrollArea(self.centralwidget)
-        self.scrollArea.setGeometry(QtCore.QRect(10, 160, 301, 81))
+        self.scrollArea.setGeometry(QtCore.QRect(10, 160, 350, 81))
         self.scrollArea.setWidgetResizable(True)
 
         self.scrollAreaWidgetContents = QtWidgets.QWidget()
-        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 299, 79))
+        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 350, 79))
 
         self.fileInfoText = QtWidgets.QTextEdit(self.scrollAreaWidgetContents)
-        self.fileInfoText.setGeometry(QtCore.QRect(0, 0, 301, 81))
+        self.fileInfoText.setGeometry(QtCore.QRect(0, 0, 350, 81))
         font.setPointSize(14)
         self.fileInfoText.setFont(font)
 
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
         self.CalculateMD5Button = QtWidgets.QPushButton(self.centralwidget)
-        self.CalculateMD5Button.setGeometry(QtCore.QRect(330, 200, 101, 51))
+        self.CalculateMD5Button.setGeometry(QtCore.QRect(330+50, 200, 101, 51))
 
         self.CalculateSHA256Button = QtWidgets.QPushButton(self.centralwidget)
-        self.CalculateSHA256Button.setGeometry(QtCore.QRect(440, 200, 111, 51))
+        self.CalculateSHA256Button.setGeometry(QtCore.QRect(330+110+50, 200, 111, 51))
 
         self.label_2 = QtWidgets.QLabel(self.centralwidget)
         self.label_2.setGeometry(QtCore.QRect(10, 120, 251, 51))
@@ -55,10 +55,10 @@ class Ui_MainWindow(object):
         self.label_2.setFont(font)
 
         self.filePathText = QtWidgets.QLineEdit(self.centralwidget)
-        self.filePathText.setGeometry(QtCore.QRect(10, 30, 291, 31))
+        self.filePathText.setGeometry(QtCore.QRect(10, 30, 350, 31))
 
         self.openFileButton = QtWidgets.QPushButton(self.centralwidget)
-        self.openFileButton.setGeometry(QtCore.QRect(330, 20, 221, 51))
+        self.openFileButton.setGeometry(QtCore.QRect(330+50, 20, 221, 51))
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
@@ -72,8 +72,8 @@ class Ui_MainWindow(object):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "K210 固件转换工具"))
         MainWindow.setWindowIcon(QIcon('./icon_firmware.png'))
-        self.ConversionToBurnButton.setText(_translate("MainWindow", "转换为工厂预烧录固件"))
-        self.ConversionToNormalButton.setText(_translate("MainWindow", "转换为人工手动烧录固件"))
+        self.ConversionToBurnButton.setText(_translate("MainWindow", "转换为 K210 FLASH 预烧录固件"))
+        self.ConversionToNormalButton.setText(_translate("MainWindow", "转换为 K210 原始固件"))
         self.fileTypeInfo.setText(_translate("MainWindow", "文件类型："))
         self.fileInfoText.setText("")
         self.CalculateMD5Button.setText(_translate("MainWindow", "计算文件 MD5"))
