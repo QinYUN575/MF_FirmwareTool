@@ -1,0 +1,3 @@
+[submodule "tools/kflash"]
+	path = tools/kflash
+	url = https://github.com/QinYUN575/kflash.py.git
