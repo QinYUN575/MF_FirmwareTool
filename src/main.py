@@ -11,7 +11,6 @@ from enum import Enum, unique
 
 import hashlib
 import struct
-import threading
 
 
 @unique
@@ -24,17 +23,20 @@ class FileType(Enum):
 class MainWindows(QtWidgets.QMainWindow):
 
     firmware_start_bytes = [b'\x21\xa8', b'\xef\xbe', b'\xad\xde']
+    firmware_start_bytes_lenght = 6
 
     def __init__(self):
         super(MainWindows, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self.filePath = ""
-        self.savePath = ""
+        self.saveFilePath = ""
         self.packing = False
+        self.fileType = FileType.TYPE_UNKNOWN
         self.isBurnType = False  # 默认为非预烧录固件
 
-        self.ui.openFileButton.clicked.connect(lambda: self.selectFile())
+        self.ui.openFileButton.clicked.connect(
+            lambda: self.selectOpenFile(self.filePath))
         self.ui.CalculateMD5Button.clicked.connect(
             lambda: self.CalculateFileHash("计算文件 MD5, 请先打开文件", hash_fun=hashlib.md5))
         self.ui.CalculateSHA256Button.clicked.connect(
@@ -44,32 +46,11 @@ class MainWindows(QtWidgets.QMainWindow):
             lambda: self.ConversionToBurnFirmware(self.filePath))
 
         self.ui.ConversionToNormalButton.clicked.connect(
-            lambda: self.ConversionToNormalFirmware(self.savePath))
-
-    def selectFile(self):
-        oldPath = self.filePath
-        if oldPath == "":
-            oldPath = os.getcwd()
-        fileName_choose, filetype = QFileDialog.getOpenFileName(self,
-                                                                "选择固件",
-                                                                oldPath, "bin Files (*.bin);;")   # 设置文件扩展名过滤,用双分号间隔
-        # print(fileName_choose, filetype)
-        self.ui.fileInfoText.setText("")
-        self.ui.filePathText.setText(fileName_choose)
-        self.filePath = fileName_choose
-        # print(self.filePath)
-        file_type = self.getfileType(self.filePath)
-        if (file_type == FileType.TYPE_FIRMWARE):
-            self.ui.fileTypeInfo.setText("文件类型：K210 SDK 固件")
-        elif (file_type == FileType.TYPE_BURN_FIRMWARE):
-            self.ui.fileTypeInfo.setText("文件类型：K210 预烧录固件（ FLASH 工厂烧录）")
-        else:
-            self.ui.fileTypeInfo.setText("文件类型：未知类型文件")
-        return (fileName_choose, filetype)
+            lambda: self.ConversionToNormalFirmware(self.filePath))
 
     def isFirmware(self, file):
-        f = open(file, "rb")
-        start_bytes = f.read(6)
+        fp = open(file, "rb")
+        start_bytes = fp.read(self.firmware_start_bytes_lenght)
         for flags in self.firmware_start_bytes:
             if flags not in start_bytes:
                 return False
@@ -94,22 +75,22 @@ class MainWindows(QtWidgets.QMainWindow):
             return False
         else:
             # import binascii
-            f = open(file, 'rb')
-            headflag = f.read(5)
+            fp = open(file, 'rb')
+            headflag = fp.read(headFlagSize)
             firmwareSizeflag = struct.unpack("I", headflag[1:5])[0]
-            f.seek(0)
-            bin = f.read(firmwareSizeflag + headFlagSize)
+            fp.seek(0)
+            bin = fp.read(firmwareSizeflag + headFlagSize)
             sha256Hash = hashlib.sha256(bin).digest()
             # print("固件大小："+str(firmwareSizeflag))
             # print("sha256Hash:" + str(binascii.b2a_hex(sha256Hash))) #读出来是正确的
 
             # 读取末尾 SHA256
             sha256HashOffset = file_size-sha256FlagSize
-            f.seek(sha256HashOffset)
-            sha256flag = f.read(sha256FlagSize)
+            fp.seek(sha256HashOffset)
+            sha256flag = fp.read(sha256FlagSize)
             # print("偏移地址："+ str(sha256HashOffset))
             # print("sha256flag:" + str(binascii.b2a_hex(sha256flag))) #读出来是正确的
-            f.close()
+            fp.close()
 
             if (headflag[0] != int(aseFlag[0])):
                 return False
@@ -119,124 +100,54 @@ class MainWindows(QtWidgets.QMainWindow):
             if (sha256flag != sha256Hash):
                 print("sha256[%s]:[%s]" % (sha256flag, sha256Hash))
                 return False
+            # 验证是否为有 K210 固件标志
+            start_bytes = bin[headFlagSize:headFlagSize +
+                              self.firmware_start_bytes_lenght]
+            for flags in self.firmware_start_bytes:
+                if flags not in start_bytes:
+                    return False
             return True
 
-    def getfileType(self, name):
+    def getfileType(self, filePath):
         file_type = FileType.TYPE_UNKNOWN  # 未知类型
-        if not os.path.exists(name):
-            QMessageBox.warning(self, "选择固件", "路径错误，请重新选择", QMessageBox.Yes)
-            return False
-        if name.endswith(".bin"):
-            if (self.isFirmware(name)):
-                file_type = FileType.TYPE_FIRMWARE
-            elif(self.isBurnFirmware(name)):
-                file_type = FileType.TYPE_BURN_FIRMWARE
-            else:
-                file_type = FileType.TYPE_UNKNOWN
+        if filePath.endswith(".bin"):
+            if (self.isFirmware(filePath)):
+                file_type = FileType.TYPE_FIRMWARE  # K210 原始固件
+            elif(self.isBurnFirmware(filePath)):
+                file_type = FileType.TYPE_BURN_FIRMWARE  # K210 FLASH 预烧录固件
         return file_type
 
-    def mergeBinProccess(self, fileName, saveFileName):
-        self.packing = True
-        bin = b''
-        aesFlag = b'\x00'
+    def selectOpenFile(self, filePath, handler=None):
+        oldFilePath = filePath  # 用户记录上次打开文件的路径
+        if oldFilePath == "":
+            oldFilePath = os.getcwd()
+        filePathChoose, fileTypeFilter = QFileDialog.getOpenFileName(self,
+                                                                     "选择固件", oldFilePath, "bin Files(*.bin);;")
+        # print(filePathChoose, fileTypeFilter)
+        if not os.path.exists(filePathChoose):
+            return
+        self.filePath = filePathChoose
+        self.fileType = self.getfileType(self.filePath)
+        # print("filePath:" + self.filePath)
 
-        size = os.path.getsize(self.filePath)
-        f = open(self.filePath, "rb")
-        firmware = f.read()
-        f.close()
+        # self.ui.fileInfoText.setText("")
+        self.ui.filePathText.setText(self.filePath)
 
-        bin += aesFlag                # add aes key flag
-        bin += struct.pack('I', size)  # add firmware length
-        bin += firmware               # add firmware content
-        sha256Hash = hashlib.sha256(bin).digest()
-        # print("sha256Hash:" + str(binascii.b2a_hex(sha256Hash)))
-        bin += sha256Hash             # add parity
-
-        with open(self.savePath, "wb") as f:
-            f.write(bin)
-        self.packing = False
-
-    def ConversionToBurnFirmware(self, name):
-        if not os.path.exists(self.savePath):
-            self.savePath = os.getcwd()
-        if (self.isBurnFirmware(self.filePath)):
-            QMessageBox.warning(self, "转换 FLASH 预烧录固件",
-                                "固件为 FLASH 预烧录固件，无需转换", QMessageBox.Yes)
-            return False
-        fileName_choose, filetype = QFileDialog.getSaveFileName(self,
-                                                                "Save File",
-                                                                self.savePath,
-                                                                "Binary file (*.bin)")
-        if not fileName_choose.endswith(".bin"):
-            fileName_choose += ".bin"
-        self.savePath = fileName_choose
-        self.packing = True
-
-        t = threading.Thread(target=self.mergeBinProccess,
-                             args=(fileName_choose, self.savePath))
-        t.setDaemon(True)
-        t.start()
-        while (self.packing):
-            time.sleep(0.5)
-            pass
-        QMessageBox.information(self, "转换 FLASH 预烧录固件成功！",
-                                "固件保存路径：" + self.savePath)
-
-    def exportBinProccess(self, fileName, saveFileName):
-        self.packing = True
-        headFlagSize = 5
-        sha256FlagSize = 32
-        file_size = os.path.getsize(fileName)
-        firmware_size = file_size - headFlagSize - sha256FlagSize
-        if (firmware_size <= (0)):
-            self.packing = False
-            return False
+        if self.fileType == FileType.TYPE_FIRMWARE:
+            self.ui.fileTypeInfo.setText("文件类型：K210 SDK 固件")
+        elif (self.fileType == FileType.TYPE_BURN_FIRMWARE):
+            self.ui.fileTypeInfo.setText("文件类型：K210 预烧录固件（ FLASH 工厂烧录）")
         else:
-            f = open(fileName, 'rb')
-            headflag = f.read(5)
-            firmwareSizeflag = struct.unpack("I", headflag[1:5])[0]
-            f.seek(headFlagSize)
-            firmware = f.read(firmwareSizeflag)
-            with open(saveFileName, "wb") as f:
-                f.write(firmware)
-        self.packing = False
+            self.ui.fileTypeInfo.setText("文件类型：未知类型文件")
 
-    def ConversionToNormalFirmware(self, name):
-        if not os.path.exists(self.filePath):
-            self.selectFile()
-        if not os.path.exists(self.savePath):
-            self.savePath = os.getcwd()
-        if (self.isFirmware(self.filePath)):
-            QMessageBox.warning(self, "转换为 K210 原始固件",
-                                "固件为原始固件，无需转换", QMessageBox.Yes)
-            return False
-        elif (not self.isBurnFirmware(self.filePath)):
-            QMessageBox.warning(self, "转换为 K210 原始固件",
-                                "非 K210 固件，请重新选择", QMessageBox.Yes)
-            return False
-        fileName_choose, filetype = QFileDialog.getSaveFileName(self,
-                                                                "Save File",
-                                                                self.savePath,
-                                                                "Binary file (*.bin)")
-        if not fileName_choose.endswith(".bin"):
-            fileName_choose += ".bin"
-        self.savePath = fileName_choose
-        self.packing = True
-
-        t = threading.Thread(target=self.exportBinProccess,
-                             args=(self.filePath, self.savePath))
-        t.setDaemon(True)
-        t.start()
-        while (self.packing):
-            time.sleep(0.5)
-            pass
-        QMessageBox.information(self, "转换为 K210 原始固件成功！",
-                                "固件保存路径：" + self.savePath)
+        # 回调处理
+        if handler != None:
+            handler(self.filePath)
 
     def CalculateFileHash(self, msg, hash_fun):
         if (self.filePath == ""):
-            QMessageBox.warning(self, "请选择文件", msg, QMessageBox.Yes)
-            self.selectFile()
+            QMessageBox.warning(self, "计算文件签名", msg, QMessageBox.Yes)
+            self.selectOpenFile(self.filePath)
         if (self.filePath == ""):
             return
         with open(self.filePath, 'rb') as f:
@@ -245,6 +156,117 @@ class MainWindows(QtWidgets.QMainWindow):
             _hash = obj.hexdigest()
         self.ui.fileInfoText.setText(str(_hash).upper())
         return str(_hash).upper()
+
+    def selectSaveFile(self):
+        saveFilePath = os.getcwd()
+        saveFilePathChoose, fileTypeFilter = QFileDialog.getSaveFileName(self,
+                                                                         "Save File",
+                                                                         saveFilePath,
+                                                                         "Binary file (*.bin)")
+        saveFilePath = os.path.abspath(saveFilePathChoose)
+        if saveFilePathChoose == "":
+            return (False, saveFilePath)
+        return (True, saveFilePath)
+
+    def exportNormalFirmware(self, filePath, saveFilePath):
+        self.packing = True
+        headFlagSize = 5
+        sha256FlagSize = 32
+        file_size = os.path.getsize(filePath)
+        firmware_size = file_size - headFlagSize - sha256FlagSize
+        if (firmware_size <= (0)):
+            return False
+        else:
+            f = open(filePath, 'rb')
+            headflag = f.read(headFlagSize)
+            firmwareSizeflag = struct.unpack("I", headflag[1:5])[0]
+            f.seek(headFlagSize)
+            firmware = f.read(firmwareSizeflag)
+            with open(saveFilePath, "wb") as f:
+                f.write(firmware)
+            return True
+
+    def ConversionToNormalFirmware(self, filePath):
+        if not os.path.exists(filePath):
+            QMessageBox.warning(self, "文件转换错误",
+                                "未选择固件文件，请选择之后重试", QMessageBox.Yes)
+            # self.selectOpenFile(filePath)
+            return
+        # if not os.path.exists(filePath):
+        #     return
+        if self.fileType == FileType.TYPE_FIRMWARE:
+            QMessageBox.warning(self, "转换为 K210 原始固件",
+                                "固件为原始固件，无需转换", QMessageBox.Yes)
+            return
+        if self.fileType == FileType.TYPE_UNKNOWN:
+            QMessageBox.warning(self, "转换为 K210 原始固件",
+                                "非 K210 固件，请重新选择", QMessageBox.Yes)
+            return
+        flag, self.saveFilePath = self.selectSaveFile()
+        print(flag, self.saveFilePath)
+        if not flag:  # 用户取消保存
+            return
+        if not os.path.exists(os.path.dirname(self.saveFilePath)):
+            QMessageBox.warning(self, "转换固件错误",
+                                "未选择保存路径，请重新指定保存路径", QMessageBox.Yes)
+            return
+        # 文件转换
+        if not self.saveFilePath.endswith(".bin"):
+            self.saveFilePath += ".bin"
+        # self.mergeBinFirmware(self.filePath, self.saveFilePath)
+        flag = self.exportNormalFirmware(self.filePath, self.saveFilePath)
+        if flag:
+            QMessageBox.information(self, "转换为 K210 原始固件成功！",
+                                    "固件保存路径：" + self.saveFilePath)
+        else:
+            QMessageBox.information(self, "转换为 K210 原始固件失败！",
+                                    "文件大小错误")
+
+    def mergeBinFirmware(self, filePath, saveFilePath):
+        bin = b''
+        aesFlag = b'\x00'
+
+        size = os.path.getsize(filePath)
+        fp = open(filePath, "rb")
+        firmware = fp.read()
+        fp.close()
+
+        bin += aesFlag                # add aes key flag
+        bin += struct.pack('I', size)  # add firmware length
+        bin += firmware               # add firmware content
+        sha256Hash = hashlib.sha256(bin).digest()
+        # print("sha256Hash:" + str(binascii.b2a_hex(sha256Hash)))
+        bin += sha256Hash             # add parity
+
+        with open(saveFilePath, "wb") as f:
+            f.write(bin)
+
+    def ConversionToBurnFirmware(self, filePath):
+        if not os.path.exists(filePath):
+            QMessageBox.warning(self, "文件转换错误",
+                                "未选择固件文件，请选择之后重试", QMessageBox.Yes)
+            # self.selectOpenFile(filePath)
+            return
+        # if not os.path.exists(filePath):
+        #     return
+        if self.isBurnFirmware(filePath):
+            QMessageBox.warning(self, "转换 FLASH 预烧录固件",
+                                "固件为 FLASH 预烧录固件，无需转换", QMessageBox.Yes)
+            return
+        flag, self.saveFilePath = self.selectSaveFile()
+        print(flag, self.saveFilePath)
+        if not flag:  # 用户取消保存
+            return
+        if not os.path.exists(os.path.dirname(self.saveFilePath)):
+            QMessageBox.warning(self, "转换固件错误",
+                                "未选择保存路径，请重新指定保存路径", QMessageBox.Yes)
+            return
+        # 文件转换
+        if not self.saveFilePath.endswith(".bin"):
+            self.saveFilePath += ".bin"
+        self.mergeBinFirmware(self.filePath, self.saveFilePath)
+        QMessageBox.information(self, "转换 FLASH 预烧录固件成功！",
+                                "固件保存路径：" + self.saveFilePath)
 
 
 if __name__ == "__main__":
