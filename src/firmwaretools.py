@@ -249,10 +249,16 @@ class MainWindows(QtWidgets.QMainWindow):
             return
         # if not os.path.exists(filePath):
         #     return
-        if self.isBurnFirmware(filePath):
+
+        if self.fileType == FileType.TYPE_UNKNOWN:
+            QMessageBox.warning(self, "转换 FLASH 预烧录固件",
+                                "未知文件类型，建议先检测固件类型是否为 K210 固件", QMessageBox.Yes)
+            # return
+        if self.fileType == FileType.TYPE_BURN_FIRMWARE:
             QMessageBox.warning(self, "转换 FLASH 预烧录固件",
                                 "固件为 FLASH 预烧录固件，无需转换", QMessageBox.Yes)
             return
+
         flag, self.saveFilePath = self.selectSaveFile()
         print(flag, self.saveFilePath)
         if not flag:  # 用户取消保存
